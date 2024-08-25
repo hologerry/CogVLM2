@@ -89,7 +89,7 @@ def main(
     num_jobs: int = 4,
     scalarflow_data_root: str = "/data/Dynamics/ScalarFlow_cogvideo_dataset",
 ):
-
+    print(f"device_id: {device_id}, job_idx: {job_idx}, num_jobs: {num_jobs}")
     videos_folder = os.path.join(scalarflow_data_root, "videos")
     assert os.path.exists(videos_folder), f"videos_folder {videos_folder} does not exist"
 
