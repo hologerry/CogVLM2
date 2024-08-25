@@ -1,26 +1,30 @@
+import argparse
 import io
+
 import numpy as np
 import torch
-from decord import cpu, VideoReader, bridge
+
+from decord import VideoReader, bridge, cpu
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-import argparse
+
 
 MODEL_PATH = "THUDM/cogvlm2-video-llama3-chat"
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-TORCH_TYPE = torch.bfloat16 if torch.cuda.is_available() and torch.cuda.get_device_capability()[
-    0] >= 8 else torch.float16
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+TORCH_TYPE = (
+    torch.bfloat16 if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8 else torch.float16
+)
 
 parser = argparse.ArgumentParser(description="CogVLM2-Video CLI Demo")
-parser.add_argument('--quant', type=int, choices=[4, 8], help='Enable 4-bit or 8-bit precision loading', default=0)
+parser.add_argument("--quant", type=int, choices=[4, 8], help="Enable 4-bit or 8-bit precision loading", default=0)
 args = parser.parse_args()
 
-if 'int4' in MODEL_PATH:
+if "int4" in MODEL_PATH:
     args.quant = 4
 
 
-def load_video(video_path, strategy='chat'):
-    bridge.set_bridge('torch')
-    with open(video_path, 'rb') as f:
+def load_video(video_path, strategy="chat"):
+    bridge.set_bridge("torch")
+    with open(video_path, "rb") as f:
         mp4_stream = f.read()
     num_frames = 24
 
@@ -30,14 +34,17 @@ def load_video(video_path, strategy='chat'):
         decord_vr = VideoReader(video_path, ctx=cpu(0))
     frame_id_list = None
     total_frames = len(decord_vr)
-    if strategy == 'base':
+    if strategy == "base":
         clip_end_sec = 60
         clip_start_sec = 0
         start_frame = int(clip_start_sec * decord_vr.get_avg_fps())
-        end_frame = min(total_frames,
-                        int(clip_end_sec * decord_vr.get_avg_fps())) if clip_end_sec is not None else total_frames
+        end_frame = (
+            min(total_frames, int(clip_end_sec * decord_vr.get_avg_fps()))
+            if clip_end_sec is not None
+            else total_frames
+        )
         frame_id_list = np.linspace(start_frame, end_frame - 1, num_frames, dtype=int)
-    elif strategy == 'chat':
+    elif strategy == "chat":
         timestamps = decord_vr.get_frame_timestamp(np.arange(total_frames))
         timestamps = [i[0] for i in timestamps]
         max_second = round(max(timestamps)) + 1
@@ -59,7 +66,7 @@ tokenizer = AutoTokenizer.from_pretrained(
     # padding_side="left"
 )
 
-if torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory < 48 * 1024 ** 3 and not args.quant:
+if torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory < 48 * 1024**3 and not args.quant:
     print("GPU memory is less than 48GB. Please use cli_demo_multi_gpus.py or pass `--quant 4` or `--quant 8`.")
     exit()
 
@@ -73,7 +80,7 @@ if args.quant == 4:
             load_in_4bit=True,
             bnb_4bit_compute_dtype=TORCH_TYPE,
         ),
-        low_cpu_mem_usage=True
+        low_cpu_mem_usage=True,
     ).eval()
 elif args.quant == 8:
     model = AutoModelForCausalLM.from_pretrained(
@@ -84,21 +91,21 @@ elif args.quant == 8:
             load_in_8bit=True,
             bnb_4bit_compute_dtype=TORCH_TYPE,
         ),
-        low_cpu_mem_usage=True
+        low_cpu_mem_usage=True,
     ).eval()
 else:
-    model = AutoModelForCausalLM.from_pretrained(
-        MODEL_PATH,
-        torch_dtype=TORCH_TYPE,
-        trust_remote_code=True
-    ).eval().to(DEVICE)
+    model = (
+        AutoModelForCausalLM.from_pretrained(MODEL_PATH, torch_dtype=TORCH_TYPE, trust_remote_code=True)
+        .eval()
+        .to(DEVICE)
+    )
 
 while True:
-    strategy = 'base' if 'cogvlm2-video-llama3-base' in MODEL_PATH else 'chat'
+    strategy = "base" if "cogvlm2-video-llama3-base" in MODEL_PATH else "chat"
     print(f"using with {strategy} model")
     video_path = input("video path >>>>> ")
-    if video_path == '':
-        print('You did not enter video path, the following will be a plain text conversation.')
+    if video_path == "":
+        print("You did not enter video path, the following will be a plain text conversation.")
         video = None
     else:
         video = load_video(video_path, strategy=strategy)
@@ -110,18 +117,14 @@ while True:
             break
 
         inputs = model.build_conversation_input_ids(
-            tokenizer=tokenizer,
-            query=query,
-            images=[video],
-            history=history,
-            template_version=strategy
+            tokenizer=tokenizer, query=query, images=[video], history=history, template_version=strategy
         )
 
         inputs = {
-            'input_ids': inputs['input_ids'].unsqueeze(0).to(DEVICE),
-            'token_type_ids': inputs['token_type_ids'].unsqueeze(0).to(DEVICE),
-            'attention_mask': inputs['attention_mask'].unsqueeze(0).to(DEVICE),
-            'images': [[inputs['images'][0].to('cuda').to(TORCH_TYPE)]],
+            "input_ids": inputs["input_ids"].unsqueeze(0).to(DEVICE),
+            "token_type_ids": inputs["token_type_ids"].unsqueeze(0).to(DEVICE),
+            "attention_mask": inputs["attention_mask"].unsqueeze(0).to(DEVICE),
+            "images": [[inputs["images"][0].to("cuda").to(TORCH_TYPE)]],
         }
         gen_kwargs = {
             "max_new_tokens": 2048,
@@ -133,7 +136,7 @@ while True:
         }
         with torch.no_grad():
             outputs = model.generate(**inputs, **gen_kwargs)
-            outputs = outputs[:, inputs['input_ids'].shape[1]:]
+            outputs = outputs[:, inputs["input_ids"].shape[1] :]
             response = tokenizer.decode(outputs[0], skip_special_tokens=True)
             print("\nCogVLM2-Video:", response)
         history.append((query, response))

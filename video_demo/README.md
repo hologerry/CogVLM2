@@ -29,6 +29,7 @@ python api_demo.py
 ```
 
 This will start a Restful API on the 5000 port. Run following code to make a request to the server:
+
 ```shell
 python test_api.py
 ```
@@ -40,4 +41,5 @@ After launch the Restful API server, you can run this code to start a Gradio web
 ```shell
 python gradio_demo.py
 ```
+
 Then open the browser and visit `http://0.0.0.0:7868/` to chat with the model.

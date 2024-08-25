@@ -1,4 +1,3 @@
-import argparse
 import io
 import os
 
@@ -7,19 +6,8 @@ import torch
 
 from decord import VideoReader, bridge, cpu
 from fire import Fire
+from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
-
-
-MODEL_PATH = "THUDM/cogvlm2-video-llama3-chat"
-
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-TORCH_TYPE = (
-    torch.bfloat16 if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8 else torch.float16
-)
-
-parser = argparse.ArgumentParser(description="CogVLM2-Video CLI Demo")
-parser.add_argument("--quant", type=int, choices=[4, 8], help="Enable 4-bit or 8-bit precision loading", default=0)
-args = parser.parse_args([])
 
 
 def load_video(video_data, strategy="chat"):
@@ -60,20 +48,12 @@ def load_video(video_data, strategy="chat"):
     return video_data
 
 
-tokenizer = AutoTokenizer.from_pretrained(
-    MODEL_PATH,
-    trust_remote_code=True,
-    # padding_side="left"
-)
-
-
-model = (
-    AutoModelForCausalLM.from_pretrained(MODEL_PATH, torch_dtype=TORCH_TYPE, trust_remote_code=True).eval().to(DEVICE)
-)
-
-
-def predict(prompt, video_data, temperature=0.1, device="cuda"):
+def predict(video_path, model, tokenizer, temperature=0.1, torch_type=torch.bfloat16, device="cuda"):
     strategy = "chat"
+    prompt = "Carefully watch the video and pay attention to the cause and sequence of events, the detail and movement of objects. Based on your observations describe this video in detail"
+
+    with open(video_path, "rb") as f:
+        video_data = f.read()
 
     video = load_video(video_data, strategy=strategy)
 
@@ -86,7 +66,7 @@ def predict(prompt, video_data, temperature=0.1, device="cuda"):
         "input_ids": inputs["input_ids"].unsqueeze(0).to(device),
         "token_type_ids": inputs["token_type_ids"].unsqueeze(0).to(device),
         "attention_mask": inputs["attention_mask"].unsqueeze(0).to(device),
-        "images": [[inputs["images"][0].to(device).to(TORCH_TYPE)]],
+        "images": [[inputs["images"][0].to(device).to(torch_type)]],
     }
     gen_kwargs = {
         "max_new_tokens": 2048,
@@ -103,20 +83,45 @@ def predict(prompt, video_data, temperature=0.1, device="cuda"):
         return response
 
 
+def main(
+    device_id: int = 0,
+    job_idx: int = 0,
+    num_jobs: int = 4,
+    scalarflow_data_root: str = "/data/Dynamics/ScalarFlow_cogvideo_dataset",
+):
 
-def main():
-    prompt = "Please describe this video in detail."
-    video_path = "/data/Dynamics/ScalarReal/train00.mp4"
-    with open(video_path, "rb") as f:
-        video_data = f.read()
-    response = predict(prompt, video_data, temperature=0.1)
-    output_root = "/data/Dynamics/generative_log/cogvlm_playground"
-    os.makedirs(output_root, exist_ok=True)
-    response_txt_path = f"{output_root}/response_train00.txt"
-    print(response)
-    with open(response_txt_path, "w") as f:
-        f.write(response)
+    videos_folder = os.path.join(scalarflow_data_root, "videos")
+    assert os.path.exists(videos_folder), f"videos_folder {videos_folder} does not exist"
+
+    video_names = os.listdir(videos_folder)
+    cur_job_video_names = video_names[job_idx::num_jobs]
+    cur_job_video_files = [os.path.join(videos_folder, video_name) for video_name in cur_job_video_names]
+
+    labels_folder = os.path.join(scalarflow_data_root, "labels")
+    os.makedirs(labels_folder, exist_ok=True)
+
+    model_path = "THUDM/cogvlm2-video-llama3-chat"
+
+    device = f"cuda:{device_id}" if torch.cuda.is_available() else "cpu"
+    torch_type = (
+        torch.bfloat16 if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8 else torch.float16
+    )
+
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+
+    model = (
+        AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch_type, trust_remote_code=True)
+        .eval()
+        .to(device)
+    )
+
+    for video_path in tqdm(cur_job_video_files, desc=f"Processing videos device {device_id} job {job_idx}"):
+        response = predict(video_path, model, tokenizer, temperature=0.1, torch_type=torch_type, device=device)
+        label_name = os.path.basename(video_path).replace(".mp4", ".txt")
+        response_txt_path = f"{labels_folder}/{label_name}"
+        with open(response_txt_path, "w") as f:
+            f.write(response)
 
 
 if __name__ == "__main__":
-    main()
+    Fire(main)

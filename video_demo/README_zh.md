@@ -19,6 +19,7 @@ pip install -r requirements.txt
 ```shell
 CUDA_VISIBLE_DEVICES=0 python cli_demo.py
 ```
+
 ## Restful API
 
 运行以下代码以启动一个 Restful API 服务器：
@@ -28,6 +29,7 @@ python api_demo.py
 ```
 
 这将会在5000端口启动一个 Restful API。运行以下代码以向服务器发送请求：
+
 ```shell
 python test_api.py
 ```
@@ -39,4 +41,5 @@ python test_api.py
 ```shell
 python gradio_demo.py
 ```
+
 然后打开浏览器并访问 `http://0.0.0.0:7868/` 来与模型进行聊天。
