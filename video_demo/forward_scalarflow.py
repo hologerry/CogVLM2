@@ -72,7 +72,7 @@ def predict(video_path, model, tokenizer, temperature=0.1, torch_type=torch.bflo
         "max_new_tokens": 2048,
         "pad_token_id": 128002,
         "top_k": 1,
-        "do_sample": False,
+        "do_sample": True,
         "top_p": 0.1,
         "temperature": temperature,
     }
