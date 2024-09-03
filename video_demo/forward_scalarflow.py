@@ -87,9 +87,13 @@ def main(
     device_id: int = 0,
     job_idx: int = 0,
     num_jobs: int = 4,
-    scalarflow_data_root: str = "/data/Dynamics/ScalarFlow_cogvideo_dataset",
+    skip_existing: bool = True,
+    scalarflow_data_root: str = "/data/Dynamics/ScalarFlow_cogvideox_dataset",
 ):
     print(f"device_id: {device_id}, job_idx: {job_idx}, num_jobs: {num_jobs}")
+    if skip_existing:
+        print("skip_existing is set to True, skipping existing files")
+
     videos_folder = os.path.join(scalarflow_data_root, "videos")
     assert os.path.exists(videos_folder), f"videos_folder {videos_folder} does not exist"
 
@@ -116,9 +120,11 @@ def main(
     )
 
     for video_path in tqdm(cur_job_video_files, desc=f"Processing videos device {device_id} job {job_idx}"):
-        response = predict(video_path, model, tokenizer, temperature=0.1, torch_type=torch_type, device=device)
         label_name = os.path.basename(video_path).replace(".mp4", ".txt")
         response_txt_path = f"{labels_folder}/{label_name}"
+        if skip_existing and os.path.exists(response_txt_path):
+            continue
+        response = predict(video_path, model, tokenizer, temperature=0.1, torch_type=torch_type, device=device)
         with open(response_txt_path, "w") as f:
             f.write(response)
 
