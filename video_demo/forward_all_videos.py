@@ -88,20 +88,20 @@ def main(
     job_idx: int = 0,
     num_jobs: int = 4,
     skip_existing: bool = True,
-    scalarflow_data_root: str = "/data/Dynamics/ScalarFlow_cogvideox_dataset",
+    data_root: str = "/data/Dynamics/ScalarFlow_cogvideox_dataset",
 ):
     print(f"device_id: {device_id}, job_idx: {job_idx}, num_jobs: {num_jobs}")
     if skip_existing:
         print("skip_existing is set to True, skipping existing files")
 
-    videos_folder = os.path.join(scalarflow_data_root, "videos")
+    videos_folder = os.path.join(data_root, "videos")
     assert os.path.exists(videos_folder), f"videos_folder {videos_folder} does not exist"
 
     video_names = os.listdir(videos_folder)
     cur_job_video_names = video_names[job_idx::num_jobs]
     cur_job_video_files = [os.path.join(videos_folder, video_name) for video_name in cur_job_video_names]
 
-    labels_folder = os.path.join(scalarflow_data_root, "labels")
+    labels_folder = os.path.join(data_root, "labels")
     os.makedirs(labels_folder, exist_ok=True)
 
     model_path = "THUDM/cogvlm2-video-llama3-chat"
