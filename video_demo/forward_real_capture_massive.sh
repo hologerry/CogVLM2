@@ -3,7 +3,7 @@
     --device_id $1 \
     --job_idx $2 \
     --num_jobs $3 \
-    --data_root /data/Dynamics/RealCaptureMassiveAll_cogvideox_dataset \
+    --data_root /data/Dynamics/RealCaptureBlack_cogvideox_dataset \
 
 exit
 }
