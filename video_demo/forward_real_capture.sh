@@ -1,5 +1,5 @@
 #!/bin/bash
-
+{
 # Parameters
 NUM_JOBS=$1
 #"/data/Dynamics/RealCaptureBlackBlueCloudRedBallSetData_cogvideox_dataset"
@@ -29,3 +29,6 @@ done
 # Wait for all background processes to complete
 wait
 echo "All jobs completed."
+
+exit 0
+}
